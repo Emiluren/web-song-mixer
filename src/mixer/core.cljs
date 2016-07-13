@@ -3,9 +3,24 @@
             [om.next :as om :refer-macros [defui]]
             [om.dom :as dom]))
 
-(def app-state (atom {:count 0 :extra " yo"}))
+(defonce app-state (atom {:count 0}))
+
+(defn read [{:keys [state] :as env} key params]
+  (let [st @state]
+    (if-let [value (get st key)]
+      {:value value}
+      {:value :not-found})))
+
+(defn mutate [{:keys [state] :as env} key params]
+  (if (= 'increment key)
+    {:value {:keys [:count]}
+     :action #(swap! state update :count inc)}
+    {:value :not-found}))
 
 (defui Counter
+  static om/IQuery
+  (query [this]
+    [:count])
   Object
   (render [this]
     (let [{:keys [count extra]} (om/props this)]
@@ -14,12 +29,13 @@
         (dom/br nil)
         (dom/button
           #js {:onClick
-               (fn [e]
-                 (swap! app-state update-in [:count] inc))}
-          "Click me!")))))
+               (fn [e] (om/transact! this '[(increment)]))}
+          "Clicka me!")))))
 
 (def reconciler
-  (om/reconciler {:state app-state}))
+  (om/reconciler
+    {:state app-state
+     :parser (om/parser {:read read :mutate mutate})}))
 
 (om/add-root! reconciler
   Counter (gdom/getElement "app"))
