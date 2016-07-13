@@ -3,16 +3,23 @@
             [om.next :as om :refer-macros [defui]]
             [om.dom :as dom]))
 
-(defui HelloWorld
+(def app-state (atom {:count 0 :extra " yo"}))
+
+(defui Counter
   Object
   (render [this]
-          (dom/div nil (get (om/props this) :title))))
+    (let [{:keys [count extra]} (om/props this)]
+      (dom/div nil
+        (dom/span nil (str "Count: " count extra))
+        (dom/br nil)
+        (dom/button
+          #js {:onClick
+               (fn [e]
+                 (swap! app-state update-in [:count] inc))}
+          "Click me!")))))
 
-(def hello (om/factory HelloWorld))
+(def reconciler
+  (om/reconciler {:state app-state}))
 
-(js/ReactDOM.render
- (apply dom/div nil
-        (map #(hello {:react-key %
-                      :title (str "Hello " %)})
-             ["John", "bruh", "Daisy", "and goodbye"]))
- (gdom/getElement "app"))
+(om/add-root! reconciler
+  Counter (gdom/getElement "app"))
