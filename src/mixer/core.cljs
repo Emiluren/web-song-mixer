@@ -3,50 +3,47 @@
             [om.next :as om :refer-macros [defui]]
             [om.dom :as dom]))
 
-(def app-state
-  (atom
-   {:app/title "Animals"
-    :animals/list
-    [[1 "Ant"] [2 "Antelope"] [3 "Bird"] [4 "Cat"] [5 "Dog"]
-     [6 "Lion"] [7 "Mouse"] [8 "Monkey"] [9 "Snake"] [10 "Zebro"]]}))
+(defonce app-state (atom {:count 0 :song (js/Howl. #js {:src #js ["full_mix.mp3"]})}))
 
-(defmulti read (fn [env key params] key))
+(defn mutate [{:keys [state] :as env} key params]
+  (if (= 'increment key)
+    {:value {:keys [:count]}
+     :action #(swap! state update-in [:count] inc)}
+    {:value :not-found}))
 
-(defmethod read :default
-  [{:keys [state] :as env} key params]
+(defn read [{:keys [state] :as env} key params]
   (let [st @state]
     (if-let [value (get st key)]
       {:value value}
       {:value :not-found})))
 
-(defmethod read :animals/list
-  [{:keys [state] :as key} key {:keys [start end]}]
-  {:value (subvec (:animals/list @state) start end)})
-
-(defui AnimalsList
-  static om/IQueryParams
-  (params [this]
-    {:start 0 :end 10})
-
+(defui Counter
   static om/IQuery
   (query [this]
-    '[:app/title (:animals/list {:start ?start :end ?end})])
-
+         [:count])
   Object
   (render [this]
-    (let [{:keys [app/title animals/list]} (om/props this)]
-      (dom/div nil
-        (dom/h2 nil title)
-        (apply dom/ul nil
-          (map
-            (fn [[i name]]
-              (dom/li nil (str i ". " name)))
-            list))))))
+          (let [{:keys [count song]} (om/props this)]
+            (dom/div nil
+                     (dom/span nil (str "Count: " count))
+                     (dom/button
+                      #js {:onClick
+                           (fn [e] (om/transact! this '[(increment)]))}
+                      "Click me!")
+                     (dom/div nil (str "all props" (om/props this)))
+                     (dom/button
+                      #js {:onClick
+                           (fn [e] (.play (:song @app-state)))}
+                      "Play")
+                     (dom/button
+                      #js {:onClick
+                           (fn [e] (.pause (:song @app-state)))}
+                      "Pause")))))
 
 (def reconciler
   (om/reconciler
-    {:state app-state
-     :parser (om/parser {:read read})}))
+   {:state app-state
+    :parser (om/parser {:read read :mutate mutate})}))
 
 (om/add-root! reconciler
-  AnimalsList (gdom/getElement "app"))
+              Counter (gdom/getElement "app"))
