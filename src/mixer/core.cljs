@@ -13,6 +13,12 @@
 
 (GET "songs.json" {:handler songs-handler})
 
+(defn on-click-play [e]
+  (.play (:song @app-state)))
+
+(defn on-click-pause [e]
+  (.pause (:song @app-state)))
+
 (defn mutate [{:keys [state] :as env} key params]
   (if (= 'increment key)
     {:value {:keys [:current-song]}
@@ -32,32 +38,28 @@
   (into [:div (get song "title")]
         (map create-track-ui (get song "tracks"))))
 
+(defn generated-html [component]
+  (let [{:keys [current-song songs]} (om/props component)]
+    (html [:div
+           [:span (str "Current-Song: " current-song)]
+           [:button {:onClick (fn [e] (om/transact! component '[(increment)]))} "Click me!"]
+           [:br]
+           [:br]
+
+           [:button {:onClick on-click-play} "Play"]
+           [:button {:onClick on-click-pause} "Pause"]
+           [:br]
+           [:br]
+
+           (into [:div] (map create-song-ui songs))])))
+
 (defui Mixer
   static om/IQuery
   (query [this]
          [:current-song :songs])
   Object
   (render [this]
-          (let [{:keys [current-song songs]} (om/props this)]
-            (html [:div
-                   [:span (str "Current-Song: " current-song)]
-                   [:button
-                    {:onClick (fn [e] (om/transact! this '[(increment)]))}
-                    "Click me!"]
-                   [:br]
-                   [:br]
-
-                   [:button
-                    {:onClick (fn [e] (.play (:song @app-state)))}
-                    "Play"]
-                   [:button
-                    {:onClick
-                     (fn [e] (.pause (:song @app-state)))}
-                    "Pause"]
-                   [:br]
-                   [:br]
-
-                   (into [:div] (map create-song-ui songs))]))))
+            (generated-html this)))
 
 (def reconciler
   (om/reconciler
