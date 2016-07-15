@@ -1,14 +1,22 @@
 (ns mixer.core
   (:require [goog.dom :as gdom]
             [om.next :as om :refer-macros [defui]]
-            [om.dom :as dom]))
+            [om.dom :as dom]
+            [ajax.core :refer [GET]]
+            [sablono.core :as html :refer-macros [html]]))
 
-(defonce app-state (atom {:count 0 :song (js/Howl. #js {:src #js ["full_mix.mp3"]})}))
+(defonce app-state (atom {:current-song 0
+                          :song (js/Howl. #js {:src #js ["full_mix.mp3"]})}))
+
+(defn songs-handler [songs]
+  (swap! app-state assoc :songs songs))
+
+(GET "songs.json" {:handler songs-handler})
 
 (defn mutate [{:keys [state] :as env} key params]
   (if (= 'increment key)
-    {:value {:keys [:count]}
-     :action #(swap! state update-in [:count] inc)}
+    {:value {:keys [:current-song]}
+     :action #(swap! state update-in [:current-song] inc)}
     {:value :not-found}))
 
 (defn read [{:keys [state] :as env} key params]
@@ -17,28 +25,39 @@
       {:value value}
       {:value :not-found})))
 
-(defui Counter
+(defn create-track-ui [track]
+  [:div (str "files: " (get track "files"))])
+
+(defn create-song-ui [song]
+  (into [:div (get song "title")]
+        (map create-track-ui (get song "tracks"))))
+
+(defui Mixer
   static om/IQuery
   (query [this]
-         [:count])
+         [:current-song :songs])
   Object
   (render [this]
-          (let [{:keys [count song]} (om/props this)]
-            (dom/div nil
-                     (dom/span nil (str "Count: " count))
-                     (dom/button
-                      #js {:onClick
-                           (fn [e] (om/transact! this '[(increment)]))}
-                      "Click me!")
-                     (dom/div nil (str "all props" (om/props this)))
-                     (dom/button
-                      #js {:onClick
-                           (fn [e] (.play (:song @app-state)))}
-                      "Play")
-                     (dom/button
-                      #js {:onClick
-                           (fn [e] (.pause (:song @app-state)))}
-                      "Pause")))))
+          (let [{:keys [current-song songs]} (om/props this)]
+            (html [:div
+                   [:span (str "Current-Song: " current-song)]
+                   [:button
+                    {:onClick (fn [e] (om/transact! this '[(increment)]))}
+                    "Click me!"]
+                   [:br]
+                   [:br]
+
+                   [:button
+                    {:onClick (fn [e] (.play (:song @app-state)))}
+                    "Play"]
+                   [:button
+                    {:onClick
+                     (fn [e] (.pause (:song @app-state)))}
+                    "Pause"]
+                   [:br]
+                   [:br]
+
+                   (into [:div] (map create-song-ui songs))]))))
 
 (def reconciler
   (om/reconciler
@@ -46,4 +65,4 @@
     :parser (om/parser {:read read :mutate mutate})}))
 
 (om/add-root! reconciler
-              Counter (gdom/getElement "app"))
+              Mixer (gdom/getElement "app"))
