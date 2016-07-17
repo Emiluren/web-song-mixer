@@ -14,10 +14,16 @@
 (GET "songs.json" {:handler songs-handler})
 
 (defn on-click-play [e]
-  (.play (:song @app-state)))
+  (swap! app-state assoc :playid
+         (.play (:song @app-state))))
 
 (defn on-click-pause [e]
-  (.pause (:song @app-state)))
+  (if-let [playid (get @app-state :playid)]
+    (.pause (:song @app-state) playid)
+    (.pause (:song @app-state))))
+
+(defn on-click-stop [e]
+  (.stop (:song @app-state)))
 
 (defn mutate [{:keys [state] :as env} key params]
   (if (= 'increment key)
@@ -32,7 +38,7 @@
       {:value :not-found})))
 
 (defn create-track-ui [track]
-  [:div (str "files: " (get track "files"))])
+  [:div (str (get track "name")) [:input {:type "range" :min 0 :max 100 :default-value 100}]])
 
 (defn create-song-ui [song]
   (into [:div (get song "title")]
@@ -41,13 +47,14 @@
 (defn generated-html [component]
   (let [{:keys [current-song songs]} (om/props component)]
     (html [:div
-           [:span (str "Current-Song: " current-song)]
-           [:button {:onClick (fn [e] (om/transact! component '[(increment)]))} "Click me!"]
-           [:br]
-           [:br]
+           #_[:span (str "Current-Song: " current-song)]
+           #_[:button {:onClick (fn [e] (om/transact! component '[(increment)]))} "Click me!"]
+           #_[:br]
+           #_[:br]
 
            [:button {:onClick on-click-play} "Play"]
            [:button {:onClick on-click-pause} "Pause"]
+           [:button {:onClick on-click-stop} "Stop"]
            [:br]
            [:br]
 

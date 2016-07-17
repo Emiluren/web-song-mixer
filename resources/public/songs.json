@@ -1,6 +1,9 @@
 [
-    {"title" : "Only Love",
+    {"title" : "Boulevard of Broken Dreams",
      "tracks" : [
-         {"name" : "Alla instrument", "files" : ["full_mix.mp3"]}
+       {"name" : "Sång", "files" : ["vocal7.mp3"]},
+       {"name" : "Gitarr", "files" : ["guitar7.mp3"]},
+       {"name" : "Bas", "files" : ["base7.mp3"]},
+       {"name" : "Trummor", "files" : ["drums7.mp3"]}
      ]}
 ]
