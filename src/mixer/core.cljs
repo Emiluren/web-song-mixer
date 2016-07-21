@@ -5,8 +5,12 @@
             [ajax.core :refer [GET]]
             [sablono.core :as html :refer-macros [html]]))
 
-(defonce app-state (atom {:current-song 0
-                          :song (js/Howl. #js {:src #js ["full_mix.mp3"]})}))
+(defn load-track [track]
+  (let [name (get track "name")
+        files (map #(str "songs/" %) (get track "files"))]
+    {:name name :audio (js/Howl. #js {:src (into-array files)})}))
+
+(defonce app-state (atom {}))
 
 (defn songs-handler [songs]
   (swap! app-state assoc :songs songs))
@@ -14,16 +18,25 @@
 (GET "songs.json" {:handler songs-handler})
 
 (defn on-click-play [e]
-  (swap! app-state assoc :playid
+  (doseq [track (:loaded-tracks @app-state)]
+    (.play (:audio track)))
+  #_(swap! app-state assoc :playid
          (.play (:song @app-state))))
 
 (defn on-click-pause [e]
-  (if-let [playid (get @app-state :playid)]
-    (.pause (:song @app-state) playid)
-    (.pause (:song @app-state))))
+  (doseq [track (:loaded-tracks @app-state)]
+    (.pause (:audio track))))
 
 (defn on-click-stop [e]
-  (.stop (:song @app-state)))
+  (doseq [track (:loaded-tracks @app-state)]
+    (.stop (:audio track))))
+
+(defn on-song-click [song]
+  (on-click-stop nil)
+  (let [tracks (get song "tracks")]
+    (swap! app-state assoc
+           :loaded-song song
+           :loaded-tracks (map load-track tracks))))
 
 (defn mutate [{:keys [state] :as env} key params]
   (if (= 'increment key)
@@ -38,32 +51,49 @@
       {:value :not-found})))
 
 (defn create-track-ui [track]
-  [:div (str (get track "name")) [:input {:type "range" :min 0 :max 100 :default-value 100}]])
+  [:div [:span {:style {:display "inline-block" :width "100px" :font-weight "bold"}}
+         (get track "name")]
+   [:label "Volym: "
+    [:input {:type "range" :min 0 :max 100 :default-value 100}]]
+   [:label " Balans: "
+    [:input {:type "range" :min -100 :max 100 :default-value 0}]]])
 
 (defn create-song-ui [song]
-  (into [:div (get song "title")]
-        (map create-track-ui (get song "tracks"))))
+  (if (every? #(= "loaded" (.state (:audio %))) (get :loaded-tracks @app-state))
+    [:div
+     [:div
+      [:button {:onClick on-click-play} "Play"]
+      [:button {:onClick on-click-pause} "Pause"]
+      [:button {:onClick on-click-stop} "Stop"]]
+
+     (into [:div [:h3 (get song "title")]]
+           (map create-track-ui (get song "tracks")))]
+    "Ljudfiler laddas in"))
+
+(defn create-song-list [songs]
+  (map
+   (fn [song]
+     [:li {:key (get song "title")}
+      [:a
+           {:onClick (fn [e] (on-song-click song)) :href "#"}
+           (get song "title")]])
+   songs))
 
 (defn generated-html [component]
-  (let [{:keys [current-song songs]} (om/props component)]
+  (let [{:keys [loaded-song songs]} (om/props component)]
     (html [:div
-           #_[:span (str "Current-Song: " current-song)]
-           #_[:button {:onClick (fn [e] (om/transact! component '[(increment)]))} "Click me!"]
-           #_[:br]
-           #_[:br]
+           (if (= :not-found songs)
+             "Laddar ner låtlista"
+             [:ul (create-song-list songs)])
 
-           [:button {:onClick on-click-play} "Play"]
-           [:button {:onClick on-click-pause} "Pause"]
-           [:button {:onClick on-click-stop} "Stop"]
-           [:br]
-           [:br]
-
-           (into [:div] (map create-song-ui songs))])))
+           (if (= :not-found loaded-song)
+             "Klicka på en låt i listan"
+             (create-song-ui loaded-song))])))
 
 (defui Mixer
   static om/IQuery
   (query [this]
-         [:current-song :songs])
+         [:loaded-song :songs])
   Object
   (render [this]
             (generated-html this)))

@@ -1,9 +1,20 @@
 [
     {"title" : "Boulevard of Broken Dreams",
      "tracks" : [
-       {"name" : "Sång", "files" : ["vocal7.mp3"]},
-       {"name" : "Gitarr", "files" : ["guitar7.mp3"]},
-       {"name" : "Bas", "files" : ["base7.mp3"]},
-       {"name" : "Trummor", "files" : ["drums7.mp3"]}
-     ]}
+         {"name" : "Sång", "files" : ["vocal7.mp3"]},
+         {"name" : "Gitarr", "files" : ["git7.mp3"]},
+         {"name" : "Keyboard", "files" : ["keyb7.mp3"]},
+         {"name" : "Bas", "files" : ["bass7.mp3"]},
+         {"name" : "Trummor", "files" : ["drums7.mp3"]}
+     ]
+    },
+    {"title" : "The Final Countdown",
+     "tracks" : [
+         {"name" : "Sång", "files" : ["vocal12.mp3"]},
+         {"name" : "Gitarr", "files" : ["git12.mp3"]},
+         {"name" : "Keyboard", "files" : ["keyb12.mp3"]},
+         {"name" : "Bas", "files" : ["bass12.mp3"]},
+         {"name" : "Trummor", "files" : ["drums12.mp3"]}
+     ]
+    }
 ]
