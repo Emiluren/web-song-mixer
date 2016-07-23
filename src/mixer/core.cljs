@@ -73,13 +73,32 @@
       {:value value}
       {:value :not-found})))
 
+(defn audio-for-track-name [name]
+  (some #(when (= (:name %) name)
+           (:audio %))
+        (:loaded-tracks @app-state)))
+
+(defn target-value [event]
+  (.-value (.-target event)))
+
+(defn set-volume! [name value]
+  (let [audio (audio-for-track-name name)]
+    (.volume audio (/ value 100))))
+
+(defn set-panning! [name value]
+  (let [audio (audio-for-track-name name)]
+    (.stereo audio (/ value 100))))
+
 (defn create-track-ui [track]
-  [:div [:span {:style {:display "inline-block" :width "100px" :font-weight "bold"}}
-         (get track "name")]
-   [:label "Volym: "
-    [:input {:type "range" :min 0 :max 100 :default-value 100}]]
-   [:label " Balans: "
-    [:input {:type "range" :min -100 :max 100 :default-value 0}]]])
+  (let [name (get track "name")]
+    [:div [:span {:style {:display "inline-block" :width "100px" :font-weight "bold"}}
+           name]
+     [:label "Volym: "
+      [:input {:type "range" :min 0 :max 100 :default-value 100
+               :on-input #(set-volume! name (target-value %))}]]
+     [:label " Panorering: "
+      [:input {:type "range" :min -100 :max 100 :default-value 0
+               :on-input #(set-panning! name (target-value %))}]]]))
 
 (defn create-song-ui [song finished-loading]
   (if (every? identity (vals finished-loading))
