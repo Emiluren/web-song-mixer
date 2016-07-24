@@ -22,10 +22,11 @@
   (let [name (get track "name")
         files (map #(str "songs/" %) (get track "files"))
         options #js {:src (into-array files)
+                     :html5 true ;; Needed for changing rate independent of pitch
                      :onloaderror #(show-load-error files name %1 %2)
                      :onload #(swap! app-state assoc-in
                                      [:finished-loading name] true)}]
-    {:name name :audio (js/Howl. options)}))
+    {:name name :audio (js/Howl. options) :muted false}))
 
 
 (defn songs-handler [songs]
@@ -61,10 +62,25 @@
            :selected-song song
            :loaded-tracks (doall (map load-track tracks)))))
 
-(defn mutate [{:keys [state] :as env} key params]
-  (if (= 'increment key)
-    {:value {:keys [:current-song]}
-     :action #(swap! state update-in [:current-song] inc)}
+(defn index-of-first [pred coll]
+  (first
+   (keep-indexed (fn [idx x]
+                   (when (pred x)
+                     idx))
+                 coll)))
+
+(defn track-index [track-name tracks]
+  (index-of-first #(= (:name %) track-name) tracks))
+
+;; Does not work
+;; Assert failed: mixer.core/toggle-mute mutation
+;; :value must be nil or a map with structure {:keys [...]}
+;; (or (nil? value) (map? value))
+(defn mutate [{:keys [state] :as env} key {:keys [track-name] :as params}]
+  (if (= 'toggle-mute key)
+    (let [idx (track-index track-name (:loaded-tracks state))]
+      {:value {:keys [:loaded-tracks]}
+       :action #(swap! state update-in [:loaded-tracks idx :muted] not)})
     {:value :not-found}))
 
 (defn read [{:keys [state] :as env} key params]
@@ -89,27 +105,46 @@
   (let [audio (audio-for-track-name name)]
     (.stereo audio (/ value 100))))
 
-(defn create-track-ui [track]
+(defn toggle-mute! [name]
+  (let [audio (audio-for-track-name name)]
+    (.mute audio (not (.mute audio)))))
+
+(defn set-rate! [value]
+  (doseq [track (:loaded-tracks @app-state)]
+    (.rate (:audio track) (/ value 100))))
+
+(defn create-slider [label min max default on-input]
+  [:label label
+   [:input {:type "range" :min min :max max :default-value default
+            :on-input #(on-input (target-value %))}]])
+
+(defn create-track-ui [component track]
   (let [name (get track "name")]
     [:div [:span {:style {:display "inline-block" :width "100px" :font-weight "bold"}}
            name]
-     [:label "Volym: "
-      [:input {:type "range" :min 0 :max 100 :default-value 100
-               :on-input #(set-volume! name (target-value %))}]]
-     [:label " Panorering: "
-      [:input {:type "range" :min -100 :max 100 :default-value 0
-               :on-input #(set-panning! name (target-value %))}]]]))
 
-(defn create-song-ui [song finished-loading]
+     [:span {:style {:background-color
+                     (if (.mute (audio-for-track-name name)) "#f00" "#fff")}
+             :on-click #(toggle-mute! name)}
+      "Mute"]
+
+     [:span {:style {:background-color "#ff0"}} " Solo"]
+     (create-slider " Volym: " 0 100 100 #(set-volume! name %))
+     (create-slider " Balans: " -100 100 0 #(set-panning! name %))]))
+
+(defn create-song-ui [component song finished-loading]
   (if (every? identity (vals finished-loading))
     [:div
      [:div
       [:button {:onClick play-tracks!} "Play"]
       [:button {:onClick pause-tracks!} "Pause"]
-      [:button {:onClick stop-tracks!} "Stop"]]
+      [:button {:onClick stop-tracks!} "Stop"]
+
+      (create-slider " Volym: " 0 100 100 #(.volume js/Howler (/ % 100)))
+      (create-slider " Tempo (50% - 400%): " 50 400 100 set-rate!)]
 
      (into [:div [:h3 (get song "title")]]
-           (map create-track-ui (get song "tracks")))]
+           (map #(create-track-ui component %) (get song "tracks")))]
     (str "Ljudfiler laddas in " (-> (fractions (vals finished-loading))
                                     (get true)
                                     (* 100)
@@ -135,7 +170,7 @@
 
            (if (= :not-found selected-song)
              "Klicka på en låt i listan"
-             (create-song-ui selected-song finished-loading))])))
+             (create-song-ui component selected-song finished-loading))])))
 
 (defui Mixer
   static om/IQuery
